@@ -322,7 +322,7 @@ class CameraCalibrator:
         Note: The transformation functions should only process one chessboard at a time!
         This means X, Y, Z, R, t should be individual arrays
         """
-        # part (v) - World coordinate (X,Y,Z) to normalized image coordinate (x,y)
+        # part (v) - World coordinate (X,Y,Z) to normalized image coordinate (x,y) in undistorted frame
         n = self.n_corners_per_chessboard
         P_hW = np.vstack((X, Y, Z, np.ones(n)))
         Rt = np.column_stack((R, t))
@@ -334,7 +334,7 @@ class CameraCalibrator:
         return x, y
 
     def transformWorld2PixImageUndist(self, X, Y, Z, R, t, A):
-        # part (v) - World coordinate (X,Y,Z) to pixel image coordinate (u,v)
+        # part (v) - World coordinate (X,Y,Z) to pixel image coordinate (u,v) in undistorted frame
         n = self.n_corners_per_chessboard
         P_hW = np.vstack((X, Y, Z, np.ones(n)))
         Rt = np.column_stack((R, t))
@@ -346,14 +346,14 @@ class CameraCalibrator:
         return u, v
 
     def transformWorld2NormImageDist(self, X, Y, Z, R, t, k):
-        # TODO - part (vi)
+        # part (vi) - World coordinate (X,Y,Z) to normalized image coordinate (x,y) in distorted frame
         x, y = self.transformWorld2NormImageUndist(X, Y, Z, R, t)
         x_br = x + x*(k[0]*(x**2 + y**2) + k[1]*(x**2 + y**2)**2)
         y_br = y + y*(k[0]*(x**2 + y**2) + k[1]*(x**2 + y**2)**2)
         return x_br, y_br
 
     def transformWorld2PixImageDist(self, X, Y, Z, R, t, A, k):
-        # TODO - part (vi)
+        # part (vi) - World coordinate (X,Y,Z) to pixel image coordinate (u,v) in distorted frame
         n = self.n_corners_per_chessboard
         x_br, y_br = self.transformWorld2NormImageDist(X, Y, Z, R, t, k)
         p_br = np.vstack((x_br, y_br, np.ones(n)))

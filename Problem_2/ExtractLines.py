@@ -102,7 +102,7 @@ def ExtractLines(RangeData, params):
 #-----------------------------------------------------------
 # SplitLineRecursive
 #
-# This function executes a recursive line-slitting algorithm,
+# This function executes a recursive line-splitting algorithm,
 # which recursively sub-divides line segments until no further
 # splitting is required.
 #
@@ -121,7 +121,7 @@ def SplitLinesRecursive(theta, rho, startIdx, endIdx, params):
     ##### TO DO #####
     # Implement a recursive line splitting function
     # It should call 'FitLine()' to fit individual line segments
-    # In should call 'FindSplit()' to find an index to split at
+    # It should call 'FindSplit()' to find an index to split at
     #################
     alpha = np.zeros(0)    # PLACEHOLDER (DELETE)
     r = np.zeros(0)        # PLACEHOLDER (DELETE)
@@ -154,7 +154,26 @@ def FindSplit(theta, rho, alpha, r, params):
     # not divide into segments smaller than 'MIN_POINTS_PER_SEGMENT'
     # return -1 if no split is possiple
     #################
-    splitIdx = -1    # PLACEHOLDER (DELETE)
+    # Sort data points from right to left (ascending angle)
+    org_to_asc = np.argsort(theta)
+    theta_s = theta[org_to_asc]
+    rho_s = rho[org_to_asc]
+
+    # Calculate distance from line and threshold filters
+    n = len(theta)
+    num_pts = range(0, n)   # Assume split point assigned to left segment
+    d = abs(np.multiply(rho_s, np.cos(theta_s-alpha)) - r)
+    filt = (d > params["LINE_POINT_DIST_THRESHOLD"]) & 
+           (num_pts >= params["MIN_POINTS_PER_SEGMENT"]) &
+           ((n-num_pts) >= params["MIN_POINTS_PER_SEGMENT"])
+
+    # Choose largest distance that satisfies thresholds
+    if np.any(filt):
+        asc_to_max = np.argsort(d)
+        idx = np.where(filt[asc_to_max])[-1]   # Max element is last since sorted in ascending order
+        splitIdx = org_to_asc[asc_to_max[idx]]   # Map back to unsorted data index
+    else:
+        splitIdx = -1
     return splitIdx
 
 
@@ -176,7 +195,16 @@ def FitLine(theta, rho):
     # Implement a function to fit a line to polar data points
     # based on the solution to the least squares problem (see Hw)
     #################
-    alpha, r = 0.0, 0.0    # PLACEHOLDER (DELETE)
+    n = len(theta)
+    for i in range(0, n):
+        for j in range(0, n):
+            alpha_num = alpha_num + rho[i]*rho[j]*np.cos(theta[i])*np.sin(theta[j])
+            alpha_den = alpha_num + rho[i]*rho[j]*np.cos(theta[i] + theta[j])
+    alpha_num = sum(np.multiply(rho**2, np.sin(2*theta))) - (2/n)*alpha_num
+    alpha_den = sum(np.multiply(rho**2, np.cos(2*theta))) - (1/n)*alpha_den
+
+    alpha = 0.5*np.arctan2(alpha_num, alpha_den)
+    r = (1/n)*sum(np.multiply(rho, np.cos(theta-alpha)))
     return alpha, r
 
 
