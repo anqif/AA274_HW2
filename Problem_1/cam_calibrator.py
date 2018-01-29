@@ -238,23 +238,83 @@ class CameraCalibrator:
         return u_meas, v_meas   # Lists of arrays (one per chessboard)
 
     def genCornerCoordinates(self, u_meas, v_meas):
-        # TODO - part (i)
-        raise NotImplementedError
+        # part (i) - World coordinates for each corner
+        x_line = self.d_square*np.array(range(0, self.n_corners_x, 1))
+        y_line = self.d_square*np.array(range(self.n_corners_y-1, -1, -1))   # Flip Y-axis to traditional direction
+
+        # Form 2-D array of xy-coordinates
+        x_coord = np.tile(x_line, (self.n_corners_y, 1))
+        y_coord = np.tile(y_line, (self.n_corners_x, 1)).T
+
+        # Flatten and replicate for all chessboards
+        X = self.n_chessboards*[x_coord.flatten()]
+        Y = self.n_chessboards*[y_coord.flatten()]
         return X, Y
 
     def estimateHomography(self, u_meas, v_meas, X, Y):
-        # TODO - part (ii)
-        raise NotImplementedError
+        # part (ii) - Homography of single chessboard
+        n = self.n_corners_per_chessboard
+        M_tld_T = np.vstack((X, Y, np.ones(n))).T
+        uM_tld_T = np.multiply(np.tile(u_meas, (3,1)).T, M_tld_T)
+        vM_tld_T = np.multiply(np.tile(v_meas, (3,1)).T, M_tld_T)
+
+        # Homography equation: L*x = 0
+        L = np.empty((2*n,9))
+        L[::2,:] = np.hstack((M_tld_T, np.zeros((n,3)), -uM_tld_T))
+        L[1::2,:] = np.hstack((np.zeros((n,3)), M_tld_T, -vM_tld_T))
+
+        # Solve for x and reshape into H
+        U, s, V_T = np.linalg.svd(L, full_matrices=True, compute_uv=True)
+        x = V_T[np.argmin(s),:]   # x = [h1, h2, h3] (stacked columns of H)
+        H = np.reshape(x, (3,3))
         return H
 
     def getCameraIntrinsics(self, H):
-        # TODO - part (iii)
-        raise NotImplementedError
+        # part (iii) - Linear intrinsic parameters of camera
+        def v_row(i, j, H_obs):
+            hi = H_obs[:,i]   # i-th column vector of H
+            hj = H_obs[:,j]   # j-th column vector of H
+            return np.array([hi[0]*hj[0], hi[0]*hj[1] + hi[1]*hj[0], hi[1]*hj[1],
+                             hi[2]*hj[0] + hi[0]*hj[2], hi[2]*hj[1] + hi[1]*hj[2], hi[2]*hj[2]])
+
+        # Homography constraints: V_hom*b = 0
+        V_hom = []
+        for H_obs in H:
+            V_hom.append(v_row(0, 1, H_obs))
+            V_hom.append(v_row(0, 0, H_obs) - v_row(1, 1, H_obs))
+        if len(H) == 2:   # Impose skewness constraint: gamma = 0
+            V_hom.append([0, 1, 0, 0, 0, 0])
+        if len(H) == 1:
+            raise NotImplementedError   # Need to know (u0, v0) and set gamma = 0
+        V_hom = np.asarray(V_hom)
+
+        U, s, V_T = np.linalg.svd(V_hom, full_matrices=True, compute_uv=True)
+        b = V_T[np.argmin(s),:]   # b = [B11, B12, B22, B13, B23, B33]
+
+        # Extract intrinsic parameters from B
+        v0 = (b[1]*b[2] - b[0]*b[4])/(b[0]*b[2] - b[1]**2)
+        lamb = b[5] - (b[3]**2 + v0*(b[1]*b[3] - b[0]*b[4]))/b[0]
+        alpha = np.sqrt(lamb/b[0])
+        beta = np.sqrt(lamb*b[0]/(b[0]*b[2] - b[1]**2))
+        gamma = -b[1]*(alpha**2)*beta/lamb
+        u0 = gamma*v0/beta - b[3]*alpha**2/lamb
+
+        A = np.array([[alpha, gamma, u0], [0, beta, v0], [0, 0, 1]])
         return A
 
     def getExtrinsics(self, H, A):
-        # TODO - part (iv)
-        raise NotImplementedError
+        # part (iv) - Rotation and translation of single chessboard
+        A_inv = np.linalg.inv(A)
+        lamb = 1.0/np.linalg.norm(A_inv.dot(H[:,0]))
+        r1 = lamb*A_inv.dot(H[:,0])
+        r2 = lamb*A_inv.dot(H[:,1])
+        r3 = np.cross(r1, r2)
+        t = lamb*A_inv.dot(H[:,2])
+
+        # Approximate rotation matrix
+        Q = np.vstack((r1, r2, r3)).T
+        U, s, V_T = np.linalg.svd(Q, full_matrices=False, compute_uv=True)
+        R = U.dot(V_T)
         return R, t
 
     def transformWorld2NormImageUndist(self, X, Y, Z, R, t):
@@ -262,13 +322,27 @@ class CameraCalibrator:
         Note: The transformation functions should only process one chessboard at a time!
         This means X, Y, Z, R, t should be individual arrays
         """
-        # TODO - part (v)
-        raise NotImplementedError
+        # part (v) - World coordinate (X,Y,Z) to normalized image coordinate (x,y)
+        n = self.n_corners_per_chessboard
+        P_hW = np.vstack((X, Y, Z, np.ones(n)))
+        Rt = np.column_stack((R, t))
+        P_C = Rt.dot(P_hW)   # [X_C, Y_C, Z_C]
+
+        # Camera to image coordinate (assume f = 1, origin = bottom left corner)
+        x = P_C[0,:]/P_C[2,:]   # X_C/Z_C
+        y = P_C[1,:]/P_C[2,:]   # Y_C/Z_C
         return x, y
 
     def transformWorld2PixImageUndist(self, X, Y, Z, R, t, A):
-        # TODO - part (v)
-        raise NotImplementedError
+        # part (v) - World coordinate (X,Y,Z) to pixel image coordinate (u,v)
+        n = self.n_corners_per_chessboard
+        P_hW = np.vstack((X, Y, Z, np.ones(n)))
+        Rt = np.column_stack((R, t))
+        p_h = A.dot(Rt).dot(P_hW)   # [u, v, w]
+
+        # Transform to inhomogeneous coordinates
+        u = p_h[0,:]/p_h[2,:]
+        v = p_h[1,:]/p_h[2,:]
         return u, v
 
     def transformWorld2NormImageDist(self, X, Y, R, t, k):  # TODO: test
