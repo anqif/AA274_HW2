@@ -123,9 +123,26 @@ def SplitLinesRecursive(theta, rho, startIdx, endIdx, params):
     # It should call 'FitLine()' to fit individual line segments
     # It should call 'FindSplit()' to find an index to split at
     #################
-    alpha = np.zeros(0)    # PLACEHOLDER (DELETE)
-    r = np.zeros(0)        # PLACEHOLDER (DELETE)
-    idx = np.zeros((0, 2))  # PLACEHOLDER (DELETE)
+    theta_s = theta[startIdx:endIdx]
+    rho_s = rho[startIdx:endIdx]
+
+    if startIdx == endIdx:
+        return np.empty((0)), np.empty((0)), np.empty((0,2))
+
+    # Attempt to split the fitted line segment
+    alpha, r = FitLine(theta_s, rho_s)
+    splitIdx_s = FindSplit(theta_s, rho_s, alpha, r, params)
+    if splitIdx_s == -1:
+        idx = np.array([[startIdx, endIdx]])
+    else:
+        # Fit line segments to each of the split data sets
+        splitIdx = splitIdx_s + startIdx
+        alpha_l, r_l, idx_l = SplitLinesRecursive(theta, rho, startIdx, splitIdx, params)
+        alpha_r, r_r, idx_r = SplitLinesRecursive(theta, rho, splitIdx, endIdx, params)
+
+        alpha = np.hstack((alpha_l, alpha_r))
+        r = np.hstack((r_l, r_r))
+        idx = np.vstack((idx_l, idx_r))
     return alpha, r, idx
 
 
@@ -159,18 +176,18 @@ def FindSplit(theta, rho, alpha, r, params):
     theta_s = theta[org_to_asc]
     rho_s = rho[org_to_asc]
 
-    # Calculate distance from line and threshold filters
+    # Calculate distance from line and apply threshold filters
     n = len(theta)
-    num_pts = range(0, n)   # Assume split point assigned to left segment
-    d = abs(np.multiply(rho_s, np.cos(theta_s-alpha)) - r)
-    filt = (d > params["LINE_POINT_DIST_THRESHOLD"]) & 
-           (num_pts >= params["MIN_POINTS_PER_SEGMENT"]) &
+    num_pts = np.array(range(0,n))   # Assume split point assigned to left segment
+    d = np.abs(np.multiply(rho_s, np.cos(theta_s-alpha)) - r)
+    filt = (d > params["LINE_POINT_DIST_THRESHOLD"]) & \
+           (num_pts >= params["MIN_POINTS_PER_SEGMENT"]) & \
            ((n-num_pts) >= params["MIN_POINTS_PER_SEGMENT"])
 
     # Choose largest distance that satisfies thresholds
     if np.any(filt):
         asc_to_max = np.argsort(d)
-        idx = np.where(filt[asc_to_max])[-1]   # Max element is last since sorted in ascending order
+        idx = np.where(filt[asc_to_max])[0][-1]  # Max element is last since sorted in ascending order
         splitIdx = org_to_asc[asc_to_max[idx]]   # Map back to unsorted data index
     else:
         splitIdx = -1
@@ -196,15 +213,17 @@ def FitLine(theta, rho):
     # based on the solution to the least squares problem (see Hw)
     #################
     n = len(theta)
+    alpha_num = 0
+    alpha_den = 0
     for i in range(0, n):
         for j in range(0, n):
             alpha_num = alpha_num + rho[i]*rho[j]*np.cos(theta[i])*np.sin(theta[j])
             alpha_den = alpha_num + rho[i]*rho[j]*np.cos(theta[i] + theta[j])
-    alpha_num = sum(np.multiply(rho**2, np.sin(2*theta))) - (2/n)*alpha_num
-    alpha_den = sum(np.multiply(rho**2, np.cos(2*theta))) - (1/n)*alpha_den
+    alpha_num = np.sum(np.multiply(rho**2, np.sin(2*theta))) - (2/n)*alpha_num
+    alpha_den = np.sum(np.multiply(rho**2, np.cos(2*theta))) - (1/n)*alpha_den
 
     alpha = 0.5*np.arctan2(alpha_num, alpha_den)
-    r = (1/n)*sum(np.multiply(rho, np.cos(theta-alpha)))
+    r = (1/n)*np.sum(np.multiply(rho, np.cos(theta-alpha)))
     return alpha, r
 
 
@@ -233,9 +252,35 @@ def MergeColinearNeigbors(theta, rho, alpha, r, pointIdx, params):
     #       points from two adjacent segments. If this line cannot be
     #       split, then accept the merge. If it can be split, do not merge.
     #################
-    alphaOut = np.zeros(0)         # PLACEHOLDER (DELETE)
-    rOut = np.zeros(0)             # PLACEHOLDER (DELETE)
-    pointIdxOut = np.zeros((0, 2))  # PLACEHOLDER (DELETE)
+    alphaOut = alpha.copy()
+    rOut = r.copy()
+    pointIdxOut = pointIdx.copy()
+
+    i = 0
+    N_lines = pointIdxOut.shape[0]
+    while i < (N_lines - 1):
+        startIdx = pointIdx[i,0]
+        endIdx = pointIdx[i+1,1]
+    
+        # Fit line to data from adjacent segments and attempt to split
+        alpha_fit, r_fit = FitLine(theta[startIdx:endIdx], rho[startIdx:endIdx])
+        splitIdx = FindSplit(theta[startIdx:endIdx], rho[startIdx:endIdx], alpha_fit, r_fit, params)
+
+        # Accept merge if fitted line cannot be split
+        if splitIdx == -1:
+            # Update with new segment
+            alphaOut[i] = alpha_fit
+            rOut[i] = r_fit
+            pointIdxOut[i,1] = endIdx
+        
+            # Delete old segment that was merged
+            alphaOut = np.delete(alphaOut, i+1)
+            rOut = np.delete(rOut, i+1)
+            pointIdxOut = np.delete(pointIdxOut, i+1, axis=0)
+            N_lines = N_lines - 1
+        else:
+            i = i + 1
+
     return alphaOut, rOut, pointIdxOut
 
 
