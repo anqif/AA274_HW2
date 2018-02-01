@@ -171,24 +171,19 @@ def FindSplit(theta, rho, alpha, r, params):
     # not divide into segments smaller than 'MIN_POINTS_PER_SEGMENT'
     # return -1 if no split is possiple
     #################
-    # Sort data points from right to left (ascending angle)
-    org_to_asc = np.argsort(theta)
-    theta_s = theta[org_to_asc]
-    rho_s = rho[org_to_asc]
-
     # Calculate distance from line and apply threshold filters
     n = len(theta)
     num_pts = np.array(range(0,n))   # Assume split point assigned to left segment
-    d = np.abs(np.multiply(rho_s, np.cos(theta_s-alpha)) - r)
+    d = np.abs(np.multiply(rho, np.cos(theta-alpha)) - r)
     filt = (d > params["LINE_POINT_DIST_THRESHOLD"]) & \
            (num_pts >= params["MIN_POINTS_PER_SEGMENT"]) & \
            ((n-num_pts) >= params["MIN_POINTS_PER_SEGMENT"])
 
     # Choose largest distance that satisfies thresholds
     if np.any(filt):
-        asc_to_max = np.argsort(d)
-        idx = np.where(filt[asc_to_max])[0][-1]  # Max element is last since sorted in ascending order
-        splitIdx = org_to_asc[asc_to_max[idx]]   # Map back to unsorted data index
+        org_to_max = np.argsort(d)
+        idx = np.where(filt[org_to_max])[0][-1]  # Max element is last since sorted in ascending order
+        splitIdx = org_to_max[idx]   # Map back to unsorted data index
     else:
         splitIdx = -1
     return splitIdx
@@ -217,12 +212,12 @@ def FitLine(theta, rho):
     alpha_den = 0.0
     for i in range(0, n):
         for j in range(0, n):
-            alpha_num = alpha_num + rho[i]*rho[j]*np.cos(theta[i])*np.sin(theta[j])
-            alpha_den = alpha_num + rho[i]*rho[j]*np.cos(theta[i] + theta[j])
+            alpha_num += rho[i]*rho[j]*np.cos(theta[i])*np.sin(theta[j])
+            alpha_den += rho[i]*rho[j]*np.cos(theta[i] + theta[j])
     alpha_num = np.sum(np.multiply(rho**2, np.sin(2.0*theta))) - (2.0/n)*alpha_num
     alpha_den = np.sum(np.multiply(rho**2, np.cos(2.0*theta))) - (1.0/n)*alpha_den
 
-    alpha = 0.5*np.arctan2(alpha_num, alpha_den)
+    alpha = 0.5*np.arctan2(alpha_num, alpha_den) + np.pi/2   # Rotate perpendicular by 90 degrees
     r = (1.0/n)*np.sum(np.multiply(rho, np.cos(theta-alpha)))
     return alpha, r
 
