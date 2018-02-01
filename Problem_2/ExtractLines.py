@@ -213,17 +213,17 @@ def FitLine(theta, rho):
     # based on the solution to the least squares problem (see Hw)
     #################
     n = len(theta)
-    alpha_num = 0
-    alpha_den = 0
+    alpha_num = 0.0
+    alpha_den = 0.0
     for i in range(0, n):
         for j in range(0, n):
             alpha_num = alpha_num + rho[i]*rho[j]*np.cos(theta[i])*np.sin(theta[j])
             alpha_den = alpha_num + rho[i]*rho[j]*np.cos(theta[i] + theta[j])
-    alpha_num = np.sum(np.multiply(rho**2, np.sin(2*theta))) - (2/n)*alpha_num
-    alpha_den = np.sum(np.multiply(rho**2, np.cos(2*theta))) - (1/n)*alpha_den
+    alpha_num = np.sum(np.multiply(rho**2, np.sin(2.0*theta))) - (2.0/n)*alpha_num
+    alpha_den = np.sum(np.multiply(rho**2, np.cos(2.0*theta))) - (1.0/n)*alpha_den
 
     alpha = 0.5*np.arctan2(alpha_num, alpha_den)
-    r = (1/n)*np.sum(np.multiply(rho, np.cos(theta-alpha)))
+    r = (1.0/n)*np.sum(np.multiply(rho, np.cos(theta-alpha)))
     return alpha, r
 
 
