@@ -126,6 +126,7 @@ def SplitLinesRecursive(theta, rho, startIdx, endIdx, params):
     theta_s = theta[startIdx:endIdx]
     rho_s = rho[startIdx:endIdx]
 
+    # No more splits possible if single point
     if startIdx == endIdx:
         return np.empty((0)), np.empty((0)), np.empty((0,2))
 
@@ -217,7 +218,7 @@ def FitLine(theta, rho):
     alpha_num = np.sum(np.multiply(rho**2, np.sin(2.0*theta))) - (2.0/n)*alpha_num
     alpha_den = np.sum(np.multiply(rho**2, np.cos(2.0*theta))) - (1.0/n)*alpha_den
 
-    alpha = 0.5*np.arctan2(alpha_num, alpha_den) + np.pi/2   # Rotate perpendicular by 90 degrees
+    alpha = 0.5*np.arctan2(alpha_num, alpha_den) + np.pi/2
     r = (1.0/n)*np.sum(np.multiply(rho, np.cos(theta-alpha)))
     return alpha, r
 
@@ -254,8 +255,8 @@ def MergeColinearNeigbors(theta, rho, alpha, r, pointIdx, params):
     i = 0
     N_lines = pointIdxOut.shape[0]
     while i < (N_lines - 1):
-        startIdx = pointIdx[i,0]
-        endIdx = pointIdx[i+1,1]
+        startIdx = pointIdx[i,0]   # Start of first segment
+        endIdx = pointIdx[i+1,1]   # End of next segment
     
         # Fit line to data from adjacent segments and attempt to split
         alpha_fit, r_fit = FitLine(theta[startIdx:endIdx], rho[startIdx:endIdx])
@@ -298,18 +299,18 @@ def ImportRangeData(filename):
 def main():
     # parameters for line extraction (mess with these!)
     MIN_SEG_LENGTH = 0.05  # minimum length of each line segment (m)
-    LINE_POINT_DIST_THRESHOLD = 0.02  # max distance of pt from line to split
-    MIN_POINTS_PER_SEGMENT = 4  # minimum number of points per line segment
-    MAX_P2P_DIST = 1.0  # max distance between two adjent pts within a segment
+    LINE_POINT_DIST_THRESHOLD = 0.025  # max distance of pt from line to split
+    MIN_POINTS_PER_SEGMENT = 3  # minimum number of points per line segment
+    MAX_P2P_DIST = 0.54  # max distance between two adjent pts within a segment
 
     # Data files are formated as 'rangeData_<x_r>_<y_r>_N_pts.csv
     # where x_r is the robot's x position
     #       y_r is the robot's y position
     #       N_pts is the number of beams (e.g. 180 -> beams are 2deg apart)
 
-    filename = 'rangeData_5_5_180.csv'
-    # filename = 'rangeData_4_9_360.csv'
-    # filename = 'rangeData_7_2_90.csv'
+    filename = 'rangeData_5_5_180.csv'   # Best params = [0.05, 0.065, 2, 0.80]
+    # filename = 'rangeData_4_9_360.csv'     # Best params = [0.05, 0.025, 3, 0.54]
+    # filename = 'rangeData_7_2_90.csv'    # Best params = [0.05, 0.165, 2, 0.42]
 
     # Import Range Data
     RangeData = ImportRangeData(filename)
