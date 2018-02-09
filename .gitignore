@@ -1,1 +1,5 @@
 *.pyc
+*.ipynb_checkpoints
+Problem_3/pedestrian_dataset.npz
+Problem_3/training_checkpoints
+Problem_4/datasets
