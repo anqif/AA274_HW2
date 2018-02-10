@@ -11,18 +11,37 @@ def compute_brute_force_classification(image_path, nH=8, nW=8):
     raw_image = decode_jpeg(image_path)    # H x W x 3 numpy array (3 for each RGB color channel)
 
     #### EDIT THIS CODE
+    # Determine indices of padded window idx
+    def window_idx(idx, step, bounds = [0, np.Inf], pad = [0, 0]):
+        if step <= 0:
+            raise ValueError('step must be a positive integer')
+        if bounds[1] < bounds[0]:
+            raise ValueError('upper bound must be greater than lower bound')
+        if any(p < 0 for p in pad):
+            raise ValueError('pad must be an array of non-negative integers')
+
+        start = max(idx*step - pad[0], bounds[0])
+        end = min((idx + 1)*step + pad[1], bounds[1])
+        return start, end
+
+    nclasses = 3   # (neither, dog, cat)
+    rows, cols, chans = raw_image.shape
+    rstep = int(np.floor(1.0*rows/nH))   # take floor to stay within image bounds
+    cstep = int(np.floor(1.0*cols/nW))
+    rpad = 2*[int(np.round(0.15*rows))]   # window padding
+    cpad = 2*[int(np.round(0.15*cols))]
+    window_predictions = np.empty([nH, nW, nclasses])
 
     with tf.Session() as sess:
-        window = raw_image    # the "window" here is the whole image
-        window_prediction = classify_image(window, sess)
-
-    # setting each window prediction to be the prediction for the whole image (just for something to plot)
-    # do not turn this code in and claim that "your window padding is infinite"
-    window_predictions = np.array([[window_prediction for c in range(nW)] for r in range(nH)])
-
+        for r in range(nH):
+            for c in range(nW):
+                rstart, rend = window_idx(r, rstep, [0, rows], rpad)
+                cstart, cend = window_idx(c, cstep, [0, cols], cpad)
+                window = raw_image[rstart:rend, cstart:cend]
+                window_predictions[r,c,:] = classify_image(window, sess)
     ####
 
-    return np.squeeze(np.array(predictions))
+    return np.squeeze(np.array(window_predictions))
 
 def compute_convolutional_KxK_classification(image):
     graph = tf.get_default_graph()
@@ -45,12 +64,7 @@ def compute_and_plot_saliency(image):
         logits = np.squeeze(run_with_image_input(logits_tensor, image, sess))
         top_class = np.argmax(logits)
         w_ijc = gradient_of_class_score_with_respect_to_input_image(image, top_class, sess)    # defined in utils.py
-    
-    #### EDIT THIS CODE
-    
-    M = np.zeros(raw_gradients.shape[0:2])  # something of the right shape to plot
-
-    ####
+        M = tf.reduce_max(tf.abs(w_ijc), axis = [2], keepdims = False).eval()   # compute class saliency map M_ij = max_c |w_ijc|
 
     plt.subplot(2,1,1)
     plt.imshow(M)

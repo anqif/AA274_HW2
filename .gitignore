@@ -3,3 +3,5 @@
 Problem_3/pedestrian_dataset.npz
 Problem_3/training_checkpoints
 Problem_4/datasets
+Problem_4/retrain_logs
+Problem_4/retrained_graph.pb

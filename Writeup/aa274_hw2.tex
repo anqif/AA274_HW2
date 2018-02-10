@@ -183,12 +183,37 @@
 
 \section{Classification and Sliding Window Detection}
 \begin{enumerate}
+	\item By examining \verb|bottleneck_input/BottleneckInputPlaceholder| in the \verb|final_training_ops| node, we see that each bottleneck image summary has dimension $1 \times 2048$. There are 3 bias inputs and $2048 \times 3$ weights for a total of 6147 parameters. I achieved a misclassification rate of 0.10 ($15 / 150$) on the test dataset.
 	\item See submitted code.
+	\item See submitted code. Below, I display the results on \verb|catswithdogs/007417.jpg| with window padding on each side of about 15\% the total height/width.
+	\begin{figure}[H]
+		\centering
+		\title{\bf Brute Force Classification \\
+			Padding: 40 px (height), 75 px (width)}
+		\\ \vspace{5mm}
+		\includegraphics[width=0.9\textwidth]{../Figures/hw2_4_iii_catswithdogs_007417.png}
+	\end{figure}
 	\item See submitted code.
-	\item 
-	\item 
-	\item 
-	\item See submitted code.
-	\item 
+	\begin{figure}[H]
+		\centering
+		\title{\bf Convolutional $K \times K$ Classification}
+		\\ \vspace{5mm}
+		\includegraphics[width=0.9\textwidth]{../Figures/hw2_4_iv_catswithdogs_006026.png}
+	\end{figure}
+	\item The output of the final convolutional layer, \verb|mixed_10/join:0|, feeds into the node \verb|pool_3/(pool_3)|, which performs the AvgPool operation across the $8 \times 8$ windows. Thus, the feature vector for the image as a whole is the average of the feature vectors for each image region.
+	\item See submitted code. Given the raw gradient matrix $w \in \mathbb{R}^{m \times n \times p}$, we calculate the class saliency map to be $M \in \mathbb{R}^{m \times n}$ with entries $M_{ij} = \max_c |w_{ijc}|$, i.e. the maximum magnitude of $w$ across all color channels.
+	\item I compute and plot the saliency map for test image \verb|000516.png|, which was correctly classified as a cat. In contrast, test image \verb|004831.png| depicts neither a cat nor a dog, but was misclassified as a cat with class probabilities $(P_{neg}, P_{dog}, P_{cat}) = (0.23824486, 0.2742611, 0.48749402)$. From the saliency, it is clear that the classifier detected the baby as a cat, possibly due to the angle of the photo and light saturation along the arm.
+	\begin{figure}[H]
+		\centering
+		\title{\bf Correctly Classified Image (Cat)}
+		\\ \vspace{2.5mm}
+		\includegraphics[height=0.8\textheight]{../Figures/hw2_4_vii_test_cat_000516.png}
+	\end{figure}
+	\begin{figure}[H]
+		\centering
+		\title{\bf Misclassified Image (Neg)}
+		\\ \vspace{2.5mm}
+		\includegraphics[height=0.8\textheight]{../Figures/hw2_4_vii_test_neg_004831.png}
+	\end{figure}
 \end{enumerate}
 \end{document}
