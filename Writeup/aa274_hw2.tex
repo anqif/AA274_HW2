@@ -1,7 +1,11 @@
 \documentclass[12pt]{article}
-\usepackage{fullpage,graphicx,psfrag,url,ar,rotating,float}
 \usepackage[small,bf]{caption}
+\usepackage{fullpage,graphicx,psfrag,url,ar,rotating,float}
 \usepackage{amsmath,amssymb,enumitem,bbm,subcaption,multirow}
+
+\usepackage{pgf,tikz}
+\usetikzlibrary{automata,positioning}
+
 \setlength{\captionmargin}{20pt}
 \setlist[enumerate]{label=(\roman*)}
 
@@ -215,5 +219,46 @@
 		\\ \vspace{2.5mm}
 		\includegraphics[height=0.8\textheight]{../Figures/hw2_4_vii_test_neg_004831.png}
 	\end{figure}
+\end{enumerate}
+
+\section{Stop Sign Detection and FSM in ROS}
+\begin{enumerate}
+	\item \verb|supervisor.py| publishes the current desired pose, which is a message of type \verb|Pose2D| that contains the goal position $(x_g,y_g,\theta_g)$.
+	\item See submitted code.
+	\item See submitted code.
+	\item See submitted code. From Figure 13, we can solve for
+	\begin{equation}\label{eqn:5_4_norm}
+		\frac{\tilde x - \tilde x_0}{f_x} = \frac{X_C}{Z_C} \quad \mbox{and} \quad \frac{\tilde y - \tilde y_0}{f_y} = \frac{Y_C}{Z_C}
+	\end{equation}
+	Then, $Z_C$ is determined by the unit vector constraint
+	\begin{align*}
+		1 &= X_C^2 + Y_C^2 + Z_C^2 \\ 
+		\frac{1}{Z_C^2} &= \left(\frac{X_C}{Z_C}\right)^2 + \left(\frac{Y_C}{Z_C}\right)^2 + 1 \\
+		Z_C &= \left[\left(\frac{\tilde x - \tilde x_0}{f_x}\right)^2 + \left(\frac{\tilde y - \tilde y_0}{f_y}\right)^2 + 1\right]^{-\frac{1}{2}}
+	\end{align*}
+	which we can plug back into (\ref{eqn:5_4_norm}) to get $X_C$ and $Y_C$.
+	\item TODO: Define input/output, label, and behavior of each state.
+	\begin{center}
+	\begin{tikzpicture}[shorten >= 1pt, node distance=5cm, on grid, auto]
+		\node[state, initial] (s_0)             {\verb|POSE|};
+		\node[state, accepting] (s_1) [above right=of s_0] {\verb|IDLE|};
+		\node[state] (s_2) [below right=of s_0] {\verb|STOP|};
+		\node[state] (s_3) [below right=of s_1] {\verb|CROSS|};
+		
+		\begin{scope}[every node/.style={scale=0.9}]
+		\path[->]
+		(s_0) edge[bend left]  node {$d(p,p_g) < \epsilon_g$} (s_1)
+		      edge[loop right] node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0)
+		      edge[bend right] node[text width=2.6cm, swap] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_2)
+		(s_2) edge[bend right] node[swap] {$\Delta t \geq T$} (s_3)
+		      edge[loop below] node {$\Delta t < T$} (s_2)
+		(s_3) edge[bend right] node[swap] {$d(p,p_g) < \epsilon_g$} (s_1)
+		      edge[loop right] node[text width=2.6cm] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_3)
+		      edge[bend left]  node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0);
+		\end{scope}
+	\end{tikzpicture}
+	\end{center}
+	\item See submitted code.
+	\item TODO
 \end{enumerate}
 \end{document}
