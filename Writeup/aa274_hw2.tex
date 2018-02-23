@@ -204,7 +204,7 @@
 		\\ \vspace{5mm}
 		\includegraphics[width=0.9\textwidth]{../Figures/hw2_4_iv_catswithdogs_006026.png}
 	\end{figure}
-	\item The output of the final convolutional layer, \verb|mixed_10/join:0|, feeds into the node \verb|pool_3/(pool_3)|, which performs the AvgPool operation across the $8 \times 8$ windows. Thus, the feature vector for the image as a whole is the average of the feature vectors for each image region.
+	\item The output of the final convolutional layer, \verb|mixed_10/join:0|, feeds into the node \verb|pool_3/(pool_3)|, which performs the AvgPool operation across the $8 \times 8$ windows. Thus, the feature vector for the image as a whole is the average of the feature vectors for each image subregion.
 	\item See submitted code. Given the raw gradient matrix $w \in \mathbb{R}^{m \times n \times p}$, we calculate the class saliency map to be $M \in \mathbb{R}^{m \times n}$ with entries $M_{ij} = \max_c |w_{ijc}|$, i.e. the maximum magnitude of $w$ across all color channels.
 	\item I compute and plot the saliency map for test image \verb|000516.png|, which was correctly classified as a cat. In contrast, test image \verb|004831.png| depicts neither a cat nor a dog, but was misclassified as a cat with class probabilities $(P_{neg}, P_{dog}, P_{cat}) = (0.23824486, 0.2742611, 0.48749402)$. From the saliency, it is clear that the classifier detected the baby as a cat, possibly due to the angle of the photo and light saturation along the arm.
 	\begin{figure}[H]
@@ -237,7 +237,38 @@
 		Z_C &= \left[\left(\frac{\tilde x - \tilde x_0}{f_x}\right)^2 + \left(\frac{\tilde y - \tilde y_0}{f_y}\right)^2 + 1\right]^{-\frac{1}{2}}
 	\end{align*}
 	which we can plug back into (\ref{eqn:5_4_norm}) to get $X_C$ and $Y_C$.
-	\item TODO: Define input/output, label, and behavior of each state.
+	\item Let $p = (x,y,\theta)$ be the current position, $p_g = (x_g,y_g,\theta_g)$ be the goal position, and $p_s = (x_s,y_s,\theta_s)$ be the location of the closest stop sign. Define $d:\mathbb{R}^3 \times \mathbb{R}^3 \rightarrow \mathbb{R}$ to be the standard distance function. If no stop sign is detected, we take $d(p,p_s) = \infty$. Furthermore, define the proximity thresholds $\epsilon_g = (0.1,0.1,0.15)$ and $\epsilon_s = 0.5$ m, and stopping time $T_s = 3$ seconds.
+	We consider four states: \verb|POSE|, \verb|IDLE|, \verb|STOP|, and \verb|CROSS|. In \verb|POSE| and \verb|CROSS|, the current position $p$ updates at each time step $t$ (robot is navigating toward goal), while it stays the same in \verb|STOP| and \verb|IDLE| (robot is stationary). The robot starts in \verb|POSE| and takes as input $p_g$ and $p_s$, making the appropriate state changes according to the finite state machine (FSM),
+	\begin{center}
+	\begin{tikzpicture}[shorten >= 1pt, node distance=5cm, on grid, auto]
+		\node[state, initial] (s_0)             {\verb|POSE|};
+		\node[state] (s_1) [above right=of s_0] {\verb|IDLE|};
+		\node[state] (s_2) [below right=of s_0] {\verb|STOP|};
+		\node[state] (s_3) [below right=of s_1] {\verb|CROSS|};
+		
+		\begin{scope}[every node/.style={scale=0.9}]
+		\path[->]
+		(s_0) edge[bend left]  node {$d(p,p_g) < \epsilon_g$} (s_1)
+		      edge[loop right] node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0)
+		      edge[bend right] node[text width=2.6cm, swap] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_2)
+		(s_1) edge[bend left] node {$d(p,p_g) \geq \epsilon_g$} (s_0)
+			  edge[loop above] node {$d(p,p_g) < \epsilon_g$} (s_1)
+		(s_2) edge[bend right] node[swap] {$\Delta t \geq T_s$} (s_3)
+		      edge[loop below] node {$\Delta t < T_s$} (s_2)
+		(s_3) edge[bend right] node[swap] {$d(p,p_g) < \epsilon_g$} (s_1)
+		      edge[loop right] node[text width=2.6cm] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_3)
+		      edge[bend left]  node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0);
+		\end{scope}
+	\end{tikzpicture}
+	\end{center}
+	In words, the transition rules are
+	\begin{itemize}
+		\item \verb|POSE|: If the robot is at the goal, transition to \verb|IDLE|. If the robot is not at the goal, but at a stop sign, transition to \verb|CROSS|. If the robot is neither at the goal nor at a stop sign, remain in \verb|POSE|.
+		\item \verb|IDLE|: If the robot is at the goal, remain in \verb|IDLE|, otherwise transition to \verb|POSE|.
+		\item \verb|STOP|: If 3 seconds have passed, transition to \verb|CROSS|, otherwise remain in \verb|STOP|.
+		\item \verb|CROSS|: If the robot is at the goal, transition to \verb|IDLE|. If the robot is not at the goal, but at a stop sign, remain in \verb|CROSS|. If the robot is neither at the goal nor at a stop sign, transition to \verb|POSE|.
+	\end{itemize}
+	For the purposes of this implementation, we make two simplifying assumptions. First, we consider only a single goal, so once in \verb|IDLE|, the robot remains there indefinitely. Second, we assume it takes $T_c = 3$ seconds to cross an intersection. Thus in \verb|CROSS|, the robot will move toward the goal, ignoring all stop signs, for a fixed 3 seconds. If at any point it reaches the goal, it will transition to \verb|IDLE|, otherwise it switches to \verb|POSE| after the 3 seconds are over. The simplified FSM is shown below.
 	\begin{center}
 	\begin{tikzpicture}[shorten >= 1pt, node distance=5cm, on grid, auto]
 		\node[state, initial] (s_0)             {\verb|POSE|};
@@ -248,17 +279,23 @@
 		\begin{scope}[every node/.style={scale=0.9}]
 		\path[->]
 		(s_0) edge[bend left]  node {$d(p,p_g) < \epsilon_g$} (s_1)
-		      edge[loop right] node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0)
-		      edge[bend right] node[text width=2.6cm, swap] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_2)
-		(s_2) edge[bend right] node[swap] {$\Delta t \geq T$} (s_3)
-		      edge[loop below] node {$\Delta t < T$} (s_2)
+			  edge[loop right] node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0)
+	  		  edge[bend right] node[text width=2.6cm, swap] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_2)
+		(s_2) edge[bend right] node[swap] {$\Delta t \geq T_s$} (s_3)
+			  edge[loop below] node {$\Delta t < T_s$} (s_2)
 		(s_3) edge[bend right] node[swap] {$d(p,p_g) < \epsilon_g$} (s_1)
-		      edge[loop right] node[text width=2.6cm] {$d(p,p_g) \geq \epsilon_g$, \\ $d(p,p_s) < \epsilon_s$} (s_3)
-		      edge[bend left]  node {$d(p,p_g) \geq \epsilon_g, \; d(p,p_s) \geq \epsilon_s$} (s_0);
+			  edge[loop right] node[text width=2.6cm] {$d(p,p_g) \geq \epsilon_g$, \\ $\Delta t < T_c$} (s_3)
+			  edge[bend left]  node {$d(p,p_g) \geq \epsilon_g, \; \Delta t \geq T_c$} (s_0);
 		\end{scope}
 	\end{tikzpicture}
 	\end{center}
 	\item See submitted code.
-	\item TODO
+	\item The turtlebot started in \verb|POSE|, transitioned to \verb|STOP| at the stop sign, then continued to \verb|CROSS| after 3 seconds. Once it passed the stop sign, it changed back to \verb|POSE| until it reached its destination, where it remained in \verb|IDLE|.
+	\begin{figure}[H]
+		\centering
+		\title{\bf Turtlebot Path and Velocity Profile}
+		\\ \vspace{2.5mm}
+		\includegraphics[width=0.9\textwidth]{../Figures/hw2_5_vii.png}
+	\end{figure}
 \end{enumerate}
 \end{document}
